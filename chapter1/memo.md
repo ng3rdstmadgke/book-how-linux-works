@@ -90,3 +90,79 @@ kill 3333472
 ```
 
 <img width="700px" src="img/02_syscall_inf_loop.png">
+
+
+# 標準Cライブラリ
+
+C言語にはISOによって定められた標準ライブラリがあり、Linuxではglibcを標準Cライブラリとして使用する。 (glibcを指して「libc」と表記する)  
+C言語で書かれたほとんどすべてのCプログラムはlibcをリンクしており、 `ldd` コマンドを利用すると確認できる。
+
+`libc.so.6` が標準Cライブラリを指します。
+
+```bash
+ldd /bin/echo
+#         linux-vdso.so.1 (0x00007ffc0157b000)
+#         libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007de9dc800000)
+#         /lib64/ld-linux-x86-64.so.2 (0x00007de9dca8b000)
+```
+
+## システムコールのラッパー関数
+
+libcは標準Cライブラリだけではなく、システムコールのラッパー関数を提供している。  
+※ システムコールはアーキテクチャ依存のアセンブリコードを使って呼び出すため、通常C言語などの高級言語からは直接呼び出せない。
+
+x86_64アーキテクチャのCPUのgetppid()システムコール
+
+```
+mov  $0x6e,%eax
+syscall
+```
+
+arm64アーキテクチャのCPUのgetppid()システムコール
+
+```
+mov x8,<システムコール番号>
+syscall
+```
+
+<img width="700px" src="img/03_libc.png">
+
+## 静的ライブラリ・共有ライブラリ
+
+- 静的ライブラリ: コンパイル時にライブラリを実行ファイルに組み込む
+- 共有ライブラリ: 実行時にライブラリを読み込む
+
+
+静的ライブラリである `libc.a` を利用する場合
+
+- プログラムサイズは900KB程度
+- 共有ライブラリはリンクされていない
+
+```bash
+cc -static -o dst/pause src/04_pause.c 
+
+# プログラムサイズは900KBほど
+ll -h dst/pause 
+# -rwxrwxr-x 1 ubuntu ubuntu 880K Mar 17 06:05 dst/pause*
+
+# 共有ライブラリはリンクされていない
+ldd dst/pause 
+#        not a dynamic executable
+```
+
+
+共有ライブラリを利用する場合
+
+```bash
+cc -o dst/pause src/04_pause.c
+
+# プログラムサイズは16KBほど
+ll -h dst/pause
+# -rwxrwxr-x 1 ubuntu ubuntu 16K Mar 17 06:09 dst/pause*
+
+# libc (/lib/x86_64-linux-gnu/libc.so.6) を動的リンクしている
+ldd dst/pause
+#         linux-vdso.so.1 (0x00007ffd22181000)
+#         libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x000070965d000000)
+#         /lib64/ld-linux-x86-64.so.2 (0x000070965d2a4000)
+```

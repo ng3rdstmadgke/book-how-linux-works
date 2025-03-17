@@ -71,6 +71,8 @@ sar -P 0 1 1
 kill 3330856
 ```
 
+<img width="700px" src="img/01_inf_loop.png">
+
 ## システムモードを使う
 
 ```bash
@@ -86,3 +88,5 @@ sar -P 0 1 1
 
 kill 3333472
 ```
+
+<img width="700px" src="img/02_syscall_inf_loop.png">

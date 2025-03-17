@@ -32,7 +32,20 @@ python3 chapter2/src/02_fork_and_exec.py
 
 <img width="700px" src="./img/03_fork_and_exec.png">
 
-## 実行ファイルのフォーマット
+# 別のプログラムを子プロセスとして起動するposix_spawn()関数
+
+fork()とexecve()をひとまとめにしたような関数で、UNIX系OSのC言語インターフェース規格である **POSIX** に定義されている `posix_spawn()` 関数を使うと、子プロセスを立ち上げて別のプログラムを起動するといった一連の処理を簡素化できます。
+
+※ fork()を呼び出したあと、execve()関数を呼び出すだけの場合にのみposix_spawn()を利用するのがおすすめ
+
+
+```bash
+python3 chapter2/src/04_posix_spawn.py
+# echo コマンドを生成しました
+# posix_spawn()によって生成されました
+```
+
+# 実行ファイルのフォーマット
 
 
 execve()関数の実現のために、実行ファイルはプログラムのコードやデータに加えて次のようなプログラムの起動に必要なデータを保持しています
@@ -308,3 +321,253 @@ cat /proc/3568273/maps
 # 7ffc09dda000-7ffc09ddc000 r-xp 00000000 00:00 0                          [vdso]
 # ffffffffff600000-ffffffffff601000 --xp 00000000 00:00 0                  [vsyscall]
 ```
+
+# プロセスの親子関係
+
+コンピュータの電源をいれると次のような順序でシステムが初期化される
+
+1. コンピュータの電源をいれる
+2. BIOSやUEFIなどのファームウェアが起動してハードウェアを初期化する
+3. ファームウェアがGRUBなどのブートローダーを起動する
+4. ブートローダーがOSカーネルを起動する。 (Linuxカーネル)
+5. Linuxカーネルがinitプロセスを起動する
+6. initプロセスが子プロセスを起動して、子プロセスがさらにその子プロセスを起動、、、と続き、プロセスの木構造を作る
+
+
+```bash
+# -p, --show-pids: プロセスIDを表示する
+pstree -p
+# systemd(1)─┬─acpid(3334813)
+#            ├─agent(3282225)─┬─{agent}(3282233)
+#            │                ├─{agent}(3282234)
+#            │                ├─{agent}(3282235)
+#            │                ├─{agent}(3282238)
+#            │                ├─{agent}(3282245)
+#            │                ├─{agent}(3282246)
+#            │                ├─{agent}(3282376)
+#            │                ├─{agent}(3282377)
+#            │                ├─{agent}(3282378)
+#            │                └─{agent}(3282472)
+#            ├─agetty(454)
+#            ├─agetty(3334824)
+#            ├─amazon-cloudwat(404)─┬─{amazon-cloudwat}(658)
+#            │                      ├─{amazon-cloudwat}(659)
+#            │                      ├─{amazon-cloudwat}(660)
+#            │                      ├─{amazon-cloudwat}(737)
+#            │                      ├─{amazon-cloudwat}(738)
+#            │                      ├─{amazon-cloudwat}(766)
+#            │                      └─{amazon-cloudwat}(771)
+#            ├─amazon-ssm-agen(426)─┬─ssm-agent-worke(817)─┬─{ssm-agent-worke}(818)
+#            │                      │                      ├─{ssm-agent-worke}(819)
+#            │                      │                      ├─{ssm-agent-worke}(820)
+#            │                      │                      ├─{ssm-agent-worke}(821)
+#            │                      │                      ├─{ssm-agent-worke}(822)
+#            │                      │                      ├─{ssm-agent-worke}(823)
+#            │                      │                      ├─{ssm-agent-worke}(824)
+#            │                      │                      ├─{ssm-agent-worke}(825)
+#            │                      │                      ├─{ssm-agent-worke}(11425)
+#            │                      │                      └─{ssm-agent-worke}(1537506)
+```
+
+# プロセスの状態
+
+プロセスがどの程度CPUを使ったかは `ps aux` コマンドの STARTフィールド、TIMEフィールドで確認できます。
+
+- START: 起動時刻
+- TIME: CPUの利用時間
+- STAT: プロセスの状態
+  - 1文字目
+    - `S` : スリープ状態
+    - `Z` : ゾンビ状態
+    - `R` : 実行可能状態
+
+```bash
+ps aux
+# USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+# ubuntu   3424751  3.8  5.4 88295152 879724 ?     Sl   05:46   7:30 /home/ubuntu/.vscode-server/cli/servers/Stable-2fc07b811f760549dab9be9d2bedd06c51dfcb9a/server/node ...
+```
+
+<img width="700px" src="./img/04_process_stat.png">
+
+システムの全プロセスがアイドル状態の場合、論理CPU上ではアイドルプロセスという何もしない特殊なプロセスが動作しています。  
+アイドルプロセスはCPUの特殊な命令を用いて論理CPUを休止状態にし、一つ以上のプロセスが実行可能状態になるまで消費電力を抑えた状態で待機します。
+
+
+# プロセスの終了
+
+プロセスを終了させるにはexit_group()というシステムコールを呼びます。`exit()` 関数を呼ぶと呼び出されますが、プログラムが明示的に呼び出さなくてもlibcなどが内部的に呼び出しています。  
+exit_group()関数の中でカーネルはメモリなどのプロセスのリソースを回収します。
+
+プロセスが終了したあとは親プロセスがwait()やwaitpid()といったシステムコールを呼び出すことによって以下のような情報を取得できます。
+
+- プロセスの戻り値
+- シグナル
+- 終了までにどれだけのCPU時間を使ったか
+
+
+```bash
+bash chapter2/src/05_wait_ret.sh
+# false コマンドが終了しました: 1
+```
+
+# ゾンビプロセスと孤児プロセス
+
+- **ゾンビプロセス**  
+子プロセスが終了してから親プロセスがwait()などのシステムコールを呼び出すまで、終了した子プロセスはシステム上になんらかの形で残ってしまう。  
+この、終了したけど親が終了状態を得ていない状態のプロセスをゾンビプロセスと呼びます
+- **孤児プロセス**
+親プロセスがwait()系のシステムコールの実行前に終了した場合、子プロセスは孤児プロセスとなります。  
+
+
+孤児プロセスや親が終了したゾンビプロセスはinitの子プロセスとなりますが、initは定期的にwait()系のシステムコールを実行してシステムリソースを回収します。
+
+
+# シグナル
+
+| シグナル | 送信方法 | 説明 |
+| --- | --- | --- |
+| SIGINT | `Ctrl + c`<br>`kill -INT <pid>` | プロセスを直ちに終了させる |
+| SIGCHLD |  | 子プロセス終了時に親プロセスに送られる。<br>このシグナルハンドラの中でwait()系システムコールを呼ぶのが一般的 |
+| SIGSTOP | `Ctrl + z` | プロセスの実行を一時的に停止する |
+| SIGCONT |  | SIGSTOPなどにより停止したプロセスを再開する |
+| SIGKILL | `kill -9 <pid>` | プロセスを必ず終了させる。シグナルハンドラによる挙動の変更はできない |
+
+
+プロセスは各シグナルについてシグナルハンドラという処理をあらかじめ登録しておける。
+
+<img width="700px" src="./img/05_signal.png">
+
+シグナルハンドラを利用すと `Ctrl + c` で終了できない迷惑なプログラムを作成することも可能
+
+```bash
+python3 chapter2/src/06_intignore.py
+# ^Csignal SIGINT (2) received.
+# ^Csignal SIGINT (2) received.
+# ^Csignal SIGINT (2) received.
+
+# Ctrl + z
+ps aux | grep 06_intignore
+
+kill PID
+```
+
+# セッションとプロセスグループ
+
+## ジョブ管理
+
+ジョブとはbashのようなシェルがバックグラウンドで実行したプロセスを制御するための仕組みです。
+
+```bash
+sleep infinity &
+# [1] 3862144
+sleep infinity &
+# [2] 3862187
+jobs
+# [1]-  Running                 sleep infinity &
+# [2]+  Running                 sleep infinity &
+fg 1
+# sleep infinity
+^Z
+# [1]+  Stopped                 sleep infinity
+jobs
+# [1]+  Stopped                 sleep infinity
+# [2]-  Running                 sleep infinity &
+```
+
+
+## セッション
+
+セッションはユーザーが端末やsshなどを通してシステムにログインしたときのログインセッションに対応するものです。  
+通常は `pty/<n>` という名前の仮想端末がそれぞれのセッションに対して割り当てられます。
+
+```bash
+tty
+# /dev/pts/0
+```
+
+セッションにはSID(セッションID)と呼ばれる一意な値が割り振られています。セッションには、セッションリーダーというプロセスが一つ存在していて、通常はbashなどのシェルになります。  
+セッションリーダーのPIDはSID(セッションID)に等しいです。
+
+ログインシェルのSIDと同一セッションに属するプロセスグループ、セッションに割り当てられている仮想端末を調べてみましょう
+
+```bash
+# セッショングループにプロセスを追加
+sleep infinity &
+
+# ログインシェルのPIDを調査
+echo $$
+# 3868670
+
+
+# SID=3868670を持つプロセスが同一セッションのプロセス
+# TTY=pts/13がセッションに割り当てられている仮想端末
+ps ajx | grep "3868670"
+#    PPID     PID    PGID     SID TTY        TPGID STAT   UID   TIME COMMAND
+# 3868669 3868670 3868670 3868670 pts/13   3883406 Ss    1000   0:00 -bash
+# 3868670 3882358 3882358 3868670 pts/13   3883406 S     1000   0:00 sleep infinity
+# 3868670 3883406 3883406 3868670 pts/13   3883406 R+    1000   0:00 ps ajx
+# 3868670 3883407 3883406 3868670 pts/13   3883406 S+    1000   0:00 grep --color=auto 3868670
+```
+
+セッションに紐づいている端末がハングアップすると、セッションリーダーに SIGHUP が送られます。(端末ウィンドウを閉じた時やsshを切断した時にこの状況になります)  
+bashはこの時、自分が管理するジョブを終了させてから自分も終了しますが、実行に時間がかかるプロセスの実行中にbashが終了しては困る場合は以下の手段が使えます。
+
+- nohupコマンド  
+SIGHUPを無視する設定にしたうえでプロセスを起動する。この後にセッションが終了してSIGHUPが送られてもプロセスは終了しない
+- bashのdisown組み込みコマンド  
+実行中のジョブをbashの管理下から外す。これによってbashが終了しても当該ジョブにはSIGHUPが送られない
+
+
+## プロセスグループ
+
+プロセスグループは複数のプロセスをまとめてコントロールするためのもので、セッションの中には複数のプロセスグループが存在します。  
+基本的にはシェルが作ったジョブがプロセスグループに相当すると考えればよいです。
+
+例えばあるセッションで `go build FILE_PATH &` と `ps aux | less` を実行したとすると、 `go build FILE_PATH &` と `ps aux | less` に対応する2つのプロセスグループを作成します。
+
+プロセスグループを使うと、当該プロセスグループに所属する全プロセスに対してシグナルを投げることができます。例えば `PGID=100` なら `kill 100` とすれば良いです。
+
+セッション内のプロセスグループは以下の2種類に分けられます。
+
+- フォアグラウンドプロセスグループ  
+シェルにおけるフォアグラウンドジョブに対応。セッションに一つだけ存在し、セッションの端末に直接アクセスできます。
+- バックグラウンドプロセスグループ  
+シェルにおけるバックグラウンドジョブに対応。バックグラウンドプロセスが端末を操作しようとすると、SIGSTOPを受けたときのように実行が一時中断され、fgコマンドなどでフォアグラウンドプロセスグループになるまでこの状態が続く
+
+
+<img width="700px" src="./img/06_process_group.png">
+
+
+**PGID**がプロセスグループ。**STAT**フィールドに `+` がついているプロセスがフォアグラウンドのプロセスグループに属するプロセス。
+
+```bash
+ps ajx | grep 3868670
+#    PPID     PID    PGID     SID TTY        TPGID STAT   UID   TIME COMMAND
+# 3868669 3868670 3868670 3868670 pts/13   3904024 Ss    1000   0:00 -bash
+# 3868670 3904025 3904024 3868670 pts/13   3904024 S+    1000   0:00 less
+```
+
+
+# デーモン
+
+常駐プロセスのこと
+
+- 端末から入出力する必要がないので、端末が割り当てられない
+- あらゆるログインセッションを終了しても影響を受けないように、独自のセッションを持つ
+- デーモンを生成したプロセスがデーモンの終了を気にしなくていいように、initが親になっている
+
+
+<img width="700px" src="./img/07_daemon.png">
+
+
+デーモンプロセスを確認してみましょう
+
+- 親プロセスはinitなので `PPID=1`
+- SID(セッションID)はPIDを等しい
+- 端末が結びつかないため `TTY` は `?` となる
+
+
+```bash
+ps ajx | grep sshd
+#    PPID     PID    PGID     SID TTY        TPGID STAT   UID   TIME COMMAND
+#       1 3334837 3334837 3334837 ?             -1 Ss       0   0:00 sshd: /usr/sbin/sshd -D -o AuthorizedKeysCommand /usr/share/ec2-instance-connect/eic_run_authorized_keys %u %f -o AuthorizedKeysCommandUser ec2-instance-connect [listener] 0 of 10-100 startups

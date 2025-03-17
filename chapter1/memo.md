@@ -11,16 +11,16 @@ cd chapter1
 goでサンプルスクリプトを作る
 
 ```bash
-go build -o dst/ src/01_hello.go 
-./dst/01_hello
+go build -o chapter1/dst/ chapter1/src/01_hello.go 
+./chapter1/dst/01_hello
 # Hello, World
 ```
 
 `strace` コマンドで発行されたシステムコールを確認
 
 ```bash
-strace -o dst/01_hello.log dst/01_hello
-less dst/01_hello.log
+strace -o chapter1/dst/01_hello.log chapter1/dst/01_hello
+less chapter1/dst/01_hello.log
 # ...
 # write(1, "Hello, World\n", 13)          = 13
 # ...
@@ -58,7 +58,7 @@ sar -P 0 1 1
 `taskset -c <論理CPU番号> <コマンド>` を利用すると指定したCPU上で
 
 ```bash
-taskset -c 0 python3 src/02_inf_loop.py &
+taskset -c 0 python3 chapter1/src/02_inf_loop.py &
 # [1] 3330856
 
 sar -P 0 1 1
@@ -76,7 +76,7 @@ kill 3330856
 ## システムモードを使う
 
 ```bash
-taskset -c 0 python3 src/03_syscall_inf_loop.py &
+taskset -c 0 python3 chapter1/src/03_syscall_inf_loop.py &
 # [1] 3333472
 
 sar -P 0 1 1
@@ -139,14 +139,14 @@ syscall
 - 共有ライブラリはリンクされていない
 
 ```bash
-cc -static -o dst/pause src/04_pause.c 
+cc -static -o chapter1/dst/pause chapter1/src/04_pause.c 
 
 # プログラムサイズは900KBほど
-ll -h dst/pause 
-# -rwxrwxr-x 1 ubuntu ubuntu 880K Mar 17 06:05 dst/pause*
+ll -h chapter1/dst/pause 
+# -rwxrwxr-x 1 ubuntu ubuntu 880K Mar 17 06:05 chapter1/dst/pause*
 
 # 共有ライブラリはリンクされていない
-ldd dst/pause 
+ldd chapter1/dst/pause 
 #        not a dynamic executable
 ```
 
@@ -154,14 +154,14 @@ ldd dst/pause
 共有ライブラリを利用する場合
 
 ```bash
-cc -o dst/pause src/04_pause.c
+cc -o chapter1/dst/pause chapter1/src/04_pause.c
 
 # プログラムサイズは16KBほど
-ll -h dst/pause
-# -rwxrwxr-x 1 ubuntu ubuntu 16K Mar 17 06:09 dst/pause*
+ll -h chapter1/dst/pause
+# -rwxrwxr-x 1 ubuntu ubuntu 16K Mar 17 06:09 chapter1/dst/pause*
 
 # libc (/lib/x86_64-linux-gnu/libc.so.6) を動的リンクしている
-ldd dst/pause
+ldd chapter1/dst/pause
 #         linux-vdso.so.1 (0x00007ffd22181000)
 #         libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x000070965d000000)
 #         /lib64/ld-linux-x86-64.so.2 (0x000070965d2a4000)

@@ -55,7 +55,7 @@ sar -P 0 1 1
 
 ## ユーザーモードを100%使い切る
 
-`taskset -c <論理CPU番号> <コマンド>` を利用すると指定したCPU上で
+`taskset -c <論理CPU番号> <コマンド>` を利用すると指定したCPU上でコマンドを実行できる
 
 ```bash
 taskset -c 0 python3 chapter1/src/02_inf_loop.py &
@@ -139,14 +139,14 @@ syscall
 - 共有ライブラリはリンクされていない
 
 ```bash
-cc -static -o chapter1/dst/pause chapter1/src/04_pause.c 
+cc -static -o chapter1/dst/pause chapter1/src/04_pause.c
 
 # プログラムサイズは900KBほど
-ll -h chapter1/dst/pause 
+ll -h chapter1/dst/pause
 # -rwxrwxr-x 1 ubuntu ubuntu 880K Mar 17 06:05 chapter1/dst/pause*
 
 # 共有ライブラリはリンクされていない
-ldd chapter1/dst/pause 
+ldd chapter1/dst/pause
 #        not a dynamic executable
 ```
 
